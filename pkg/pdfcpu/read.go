@@ -19,6 +19,8 @@ package pdfcpu
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"sort"
@@ -983,10 +985,14 @@ func parseXRefSection(s *bufio.Scanner, ctx *Context) (*int64, error) {
 // Save PDF Version from header to xRefTable.
 // The header version comes as the first line of the file.
 // eolCount is the number of characters used for eol (1 or 2).
+
+func printStringAsHex(input string) {
+	fmt.Printf("as hex: %s\n", hex.EncodeToString([]byte(input)))
+}
+
 func headerVersion(rs io.ReadSeeker) (v *Version, eolCount int, err error) {
 
 	log.Read.Println("headerVersion begin")
-
 	var errCorruptHeader = errors.New("pdfcpu: headerVersion: corrupt pdf stream - no header version available")
 
 	// Get first line of file which holds the version of this PDFFile.
@@ -1002,7 +1008,7 @@ func headerVersion(rs io.ReadSeeker) (v *Version, eolCount int, err error) {
 
 	s := string(buf)
 	prefix := "%PDF-"
-
+	// printStringAsHex(s)
 	if len(s) < 8 || !strings.HasPrefix(s, prefix) {
 		return nil, 0, errCorruptHeader
 	}
@@ -1013,8 +1019,9 @@ func headerVersion(rs io.ReadSeeker) (v *Version, eolCount int, err error) {
 	}
 
 	s = s[8:]
+	// printStringAsHex(s)
 	s = strings.TrimLeft(s, "\t\f ")
-
+	// printStringAsHex(s)
 	// Detect the used eol which should be 1 (0x00, 0x0D) or 2 chars (0x0D0A)long.
 	// %PDF-1.x{whiteSpace}{eol}
 	if s[0] == 0x0A {
@@ -1024,6 +1031,11 @@ func headerVersion(rs io.ReadSeeker) (v *Version, eolCount int, err error) {
 		if s[9] == 0x0A {
 			eolCount = 2
 		}
+	} else if s[0:5] == "Sharp" {
+		log.Read.Println("Detected a Sharp PDF-Scan")
+		//sharp - lets try an eolCount of 1
+		eolCount = 1
+
 	} else {
 		return nil, 0, errCorruptHeader
 	}
